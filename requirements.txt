@@ -1,0 +1,6 @@
+Flask==3.0.3
+yt-dlp==2024.11.18
+ffmpeg-python==0.2.0
+tqdm==4.66.4
+python-dotenv==1.0.1 
+gunicorn

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>YouTube Clip Cutter</title>
+    <style>
+      body{font-family: system-ui, sans-serif; max-width: 760px; margin:40px auto; padding:0 16px;}
+      h1{font-size:1.6rem;margin-bottom:1rem}
+      label{display:block;margin:0.6rem 0 0.2rem;font-weight:600}
+      input[type=text], textarea{width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;font-size:0.95rem}
+      textarea{min-height:90px}
+      button{background:#2563eb;color:#fff;border:none;padding:10px 18px;border-radius:6px;font-size:1rem;cursor:pointer}
+      button:hover{background:#1d4ed8}
+      .msg{padding:10px 12px;border-radius:4px;margin-bottom:12px}
+      .error{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+      .spinner{display:none;margin:1rem 0;font-size:.9rem;color:#444;}
+    </style>
+    <script>
+      function showSpinner(){
+        const s=document.getElementById('spinner');
+        if(s) s.style.display='block';
+      }
+    </script>
+  </head>
+  <body>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for cat,msg in messages %}
+          <div class="msg {{cat}}">{{ msg }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </body>
+</html>
