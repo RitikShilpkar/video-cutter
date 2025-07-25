@@ -1,9 +1,9 @@
 # Use a slim Python image
 FROM python:3.9-slim
 
-# Install system deps (ffmpeg & yt‑dlp)
+# Install system deps (ffmpeg & yt‑dlp & chromium for headless browser)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ffmpeg && \
+    apt-get install -y --no-install-recommends ffmpeg chromium-driver chromium && \
     pip install yt-dlp && \
     rm -rf /var/lib/apt/lists/*
 
