@@ -2,6 +2,8 @@
 import re, uuid, shlex, subprocess
 from pathlib import Path
 from typing import List, Tuple
+import os
+import base64
 
 from flask import Flask, render_template, request, redirect, url_for, flash
 
@@ -12,6 +14,11 @@ CUT_DIR  = BASE_DIR / "cuts"
 OUT_DIR  = BASE_DIR / "static" / "outputs"
 for p in (DL_DIR, CUT_DIR, OUT_DIR):
     p.mkdir(parents=True, exist_ok=True)
+
+# Decode cookies.txt from environment variable if present
+if "COOKIES_B64" in os.environ:
+    with open("cookies.txt", "wb") as f:
+        f.write(base64.b64decode(os.environ["COOKIES_B64"]))
 
 # ------------------ flask ------------------
 app = Flask(
@@ -52,7 +59,8 @@ def download_youtube(url: str) -> Path:
     Download video with yt-dlp, return local MP4 path.
     """
     out_tmpl = str(DL_DIR / "%(id)s.%(ext)s")
-    cmd = f"yt-dlp -f bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4 -o {shlex.quote(out_tmpl)} {shlex.quote(url)}"
+    cookies = "cookies.txt"  # Path to your cookies file (must be present in the app directory)
+    cmd = f"yt-dlp --cookies {shlex.quote(cookies)} -f bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4 -o {shlex.quote(out_tmpl)} {shlex.quote(url)}"
     run(cmd)
     files = sorted(DL_DIR.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True)
     if not files:
