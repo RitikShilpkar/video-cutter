@@ -85,14 +85,20 @@ def download_youtube(url: str) -> Path:
     cookies = "cookies.txt"  # Path to your cookies file (must be present in the app directory)
     cmd = f"yt-dlp --cookies {shlex.quote(cookies)} -f bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4 -o {shlex.quote(out_tmpl)} {shlex.quote(url)}"
     try:
+        app.logger.info(f"Running yt-dlp command: {cmd}")
         run(cmd)
         files = sorted(DL_DIR.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True)
         if not files:
             raise FileNotFoundError("Download failed: no mp4 created.")
+        app.logger.info(f"yt-dlp successful, downloaded: {files[0]}")
         return files[0]
     except Exception as e:
-        print(f"yt-dlp failed: {e}. Trying Selenium fallback...")
-        return download_youtube_with_selenium(url)
+        app.logger.error(f"yt-dlp failed: {e}. Trying Selenium fallback...")
+        try:
+            return download_youtube_with_selenium(url)
+        except Exception as selenium_error:
+            app.logger.error(f"Selenium fallback also failed: {selenium_error}")
+            raise RuntimeError(f"YouTube download failed. yt-dlp error: {e}. Selenium error: {selenium_error}")
 
 def cut_and_concat(src: Path, segments: List[Tuple[float, float]]) -> Path:
     """
@@ -129,26 +135,52 @@ def cut():
     url  = request.form.get("url", "").strip()
     tsin = request.form.get("timestamps", "").strip()
     try:
-        segs = parse_ts_list(tsin)
-        if url:
-            src = download_youtube(url)
-        else:
+        if not url:
             raise ValueError("Please provide a YouTube URL.")
+        if not tsin:
+            raise ValueError("Please provide timestamps.")
+            
+        segs = parse_ts_list(tsin)
+        app.logger.info(f"Processing URL: {url} with {len(segs)} segments")
+        
+        src = download_youtube(url)
+        app.logger.info(f"Downloaded video to: {src}")
+        
         final_mp4 = cut_and_concat(src, segs)
+        app.logger.info(f"Created clip: {final_mp4}")
+        
         return redirect(url_for("preview", vid=final_mp4.name))
     except Exception as e:
         app.logger.exception("Cut failed")
-        flash(str(e), "error")
+        flash(f"Error: {str(e)}", "error")
         return redirect(url_for("index"))
 
 @app.get("/preview/<vid>")
 def preview(vid: str):
     vid_path = OUT_DIR / vid
     if not vid_path.exists():
-        flash("Video not found", "error")
+        app.logger.error(f"Video file not found: {vid_path}")
+        flash(f"Video file not found: {vid}", "error")
         return redirect(url_for("index"))
+    
+    app.logger.info(f"Serving video: {vid_path}")
     return render_template("preview.html",
                            video_file=url_for("static", filename=f"outputs/{vid}"))
+
+@app.get("/debug")
+def debug():
+    """Debug endpoint to check if the app is running and show basic info."""
+    import os
+    debug_info = {
+        "app_running": True,
+        "cookies_file_exists": os.path.exists("cookies.txt"),
+        "downloads_dir_exists": DL_DIR.exists(),
+        "outputs_dir_exists": OUT_DIR.exists(),
+        "cookies_file_size": os.path.getsize("cookies.txt") if os.path.exists("cookies.txt") else 0,
+        "downloads_files": len(list(DL_DIR.glob("*"))),
+        "outputs_files": len(list(OUT_DIR.glob("*")))
+    }
+    return debug_info
 
 if __name__ == "__main__":
     # For external access use: app.run(host="0.0.0.0", port=5000, debug=True)
