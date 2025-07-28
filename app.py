@@ -83,6 +83,8 @@ def download_youtube(url: str) -> Path:
     """
     out_tmpl = str(DL_DIR / "%(id)s.%(ext)s")
     cookies = "cookies.txt"  # Path to your cookies file (must be present in the app directory)
+    
+    # Try with cookies first
     cmd = f"yt-dlp --cookies {shlex.quote(cookies)} -f bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4 -o {shlex.quote(out_tmpl)} {shlex.quote(url)}"
     try:
         app.logger.info(f"Running yt-dlp command: {cmd}")
@@ -93,12 +95,30 @@ def download_youtube(url: str) -> Path:
         app.logger.info(f"yt-dlp successful, downloaded: {files[0]}")
         return files[0]
     except Exception as e:
-        app.logger.error(f"yt-dlp failed: {e}. Trying Selenium fallback...")
-        try:
-            return download_youtube_with_selenium(url)
-        except Exception as selenium_error:
-            app.logger.error(f"Selenium fallback also failed: {selenium_error}")
-            raise RuntimeError(f"YouTube download failed. yt-dlp error: {e}. Selenium error: {selenium_error}")
+        error_msg = str(e)
+        app.logger.error(f"yt-dlp failed: {error_msg}")
+        
+        # Check for specific error types
+        if "429" in error_msg or "Too Many Requests" in error_msg:
+            raise RuntimeError("YouTube is rate limiting requests. Please try again in a few minutes or use a different video.")
+        elif "content isn't available" in error_msg or "This content isn't available" in error_msg:
+            raise RuntimeError("This video is not available (private, deleted, or region-restricted). Please try a different video.")
+        elif "Sign in to confirm you're not a bot" in error_msg:
+            raise RuntimeError("YouTube requires authentication for this video. Please try a public video or check your cookies.")
+        else:
+            # Try without cookies as fallback
+            try:
+                app.logger.info("Trying yt-dlp without cookies...")
+                cmd_no_cookies = f"yt-dlp -f bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4 -o {shlex.quote(out_tmpl)} {shlex.quote(url)}"
+                run(cmd_no_cookies)
+                files = sorted(DL_DIR.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True)
+                if not files:
+                    raise FileNotFoundError("Download failed: no mp4 created.")
+                app.logger.info(f"yt-dlp without cookies successful: {files[0]}")
+                return files[0]
+            except Exception as no_cookie_error:
+                app.logger.error(f"yt-dlp without cookies also failed: {no_cookie_error}")
+                raise RuntimeError(f"Unable to download video. Error: {error_msg}. Please try a different video or check if the URL is correct.")
 
 def cut_and_concat(src: Path, segments: List[Tuple[float, float]]) -> Path:
     """
