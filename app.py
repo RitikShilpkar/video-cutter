@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
-import re, uuid, shlex, subprocess
+import re, uuid, shlex, subprocess, os, base64
 from pathlib import Path
 from typing import List, Tuple
-import os
-import base64
 
 from flask import Flask, render_template, request, redirect, url_for, flash
-from werkzeug.utils import secure_filename
 
 # ------------------ paths ------------------
 BASE_DIR = Path(__file__).resolve().parent
@@ -50,60 +47,68 @@ def parse_ts_list(ts_string: str) -> List[Tuple[float, float]]:
     return out
 
 def run(cmd: str) -> None:
-    """Run shell command, raise with stderr on failure."""
-    proc = subprocess.run(shlex.split(cmd), stderr=subprocess.PIPE)
+    """Run shell command under UTF‑8 I/O, raise with stderr on failure."""
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8"
+    proc = subprocess.run(
+        shlex.split(cmd),
+        stderr=subprocess.PIPE,
+        env=env,
+    )
     if proc.returncode != 0:
-        raise RuntimeError(proc.stderr.decode("utf-8", "ignore"))
+        err = proc.stderr.decode("utf-8", "ignore")
+        raise RuntimeError(err)
 
 def download_youtube(url: str) -> Path:
     """
     Download video with yt-dlp, return local MP4 path.
     """
     out_tmpl = str(DL_DIR / "%(id)s.%(ext)s")
-    cookies = "cookies.txt"  # Path to your cookies file (must be present in the app directory)
-    
-    # Add user-agent and other headers to look more like a real browser
-    user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    
+    cookies = "cookies.txt"
+    user_agent = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    )
+
     # Try with cookies first
-    cmd = f"yt-dlp --cookies {shlex.quote(cookies)} --user-agent {shlex.quote(user_agent)} --sleep-interval 2 --max-sleep-interval 5 -f bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4 -o {shlex.quote(out_tmpl)} {shlex.quote(url)}"
+    cmd = (
+        f"yt-dlp --cookies {shlex.quote(cookies)} "
+        f"--user-agent {shlex.quote(user_agent)} "
+        f"--sleep-interval 2 --max-sleep-interval 5 "
+        "-f bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4 "
+        f"-o {shlex.quote(out_tmpl)} {shlex.quote(url)}"
+    )
     try:
         app.logger.info(f"Running yt-dlp command: {cmd}")
         run(cmd)
         files = sorted(DL_DIR.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True)
         if not files:
             raise FileNotFoundError("Download failed: no mp4 created.")
-        app.logger.info(f"yt-dlp successful, downloaded: {files[0]}")
         return files[0]
     except Exception as e:
         error_msg = str(e)
         app.logger.error(f"yt-dlp failed: {error_msg}")
-        
-        # Check for specific error types
         if "429" in error_msg or "Too Many Requests" in error_msg:
-            raise RuntimeError("YouTube is rate limiting requests from cloud servers. Please try again in a few minutes or use a different video.")
-        elif "content isn't available" in error_msg or "This content isn't available" in error_msg:
-            raise RuntimeError("This video is not available (private, deleted, or region-restricted). Please try a different video.")
-        elif "Sign in to confirm you're not a bot" in error_msg:
-            raise RuntimeError("YouTube requires authentication for this video. Please try a public video or check your cookies.")
-        else:
-            # Try without cookies as fallback
-            try:
-                app.logger.info("Trying yt-dlp without cookies...")
-                cmd_no_cookies = f"yt-dlp --user-agent {shlex.quote(user_agent)} --sleep-interval 2 --max-sleep-interval 5 -f bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4 -o {shlex.quote(out_tmpl)} {shlex.quote(url)}"
-                run(cmd_no_cookies)
-                files = sorted(DL_DIR.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True)
-                if not files:
-                    raise FileNotFoundError("Download failed: no mp4 created.")
-                app.logger.info(f"yt-dlp without cookies successful: {files[0]}")
-                return files[0]
-            except Exception as no_cookie_error:
-                app.logger.error(f"yt-dlp without cookies also failed: {no_cookie_error}")
-                raise RuntimeError(f"Unable to download video from cloud server. YouTube may be blocking requests from this IP. Please try a different video or try again later.")
+            raise RuntimeError(
+                "YouTube is rate limiting requests. Please try again later."
+            )
+        elif "This content isn't available" in error_msg:
+            raise RuntimeError(
+                "This video is not available (private, deleted, or region‑restricted)."
+            )
+        # fallback without cookies
+        app.logger.info("Trying yt-dlp without cookies...")
+        cmd_no_cookies = cmd.replace(f"--cookies {shlex.quote(cookies)}", "")
+        run(cmd_no_cookies)
+        files = sorted(DL_DIR.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True)
+        if not files:
+            raise FileNotFoundError("Download failed: no mp4 created.")
+        return files[0]
 
 def cut_and_concat(src: Path, segments: List[Tuple[float, float]]) -> Path:
     """
-    Cut segments & concat. Re-encodes pieces, then does stream copy on concat.
+    Cut segments & concat. Re‑encode pieces, then stream‑copy on concat.
     """
     cuts = []
     for i, (st, en) in enumerate(segments):
@@ -140,49 +145,33 @@ def cut():
             raise ValueError("Please provide a YouTube URL.")
         if not tsin:
             raise ValueError("Please provide timestamps.")
-            
+
         segs = parse_ts_list(tsin)
-        app.logger.info(f"Processing URL: {url} with {len(segs)} segments")
-        
         src = download_youtube(url)
-        app.logger.info(f"Downloaded video to: {src}")
-        
         final_mp4 = cut_and_concat(src, segs)
-        app.logger.info(f"Created clip: {final_mp4}")
-        
         return redirect(url_for("preview", vid=final_mp4.name))
     except Exception as e:
         app.logger.exception("Cut failed")
-        flash(f"Error: {str(e)}", "error")
+        flash(str(e), "error")
         return redirect(url_for("index"))
 
 @app.get("/preview/<vid>")
 def preview(vid: str):
     vid_path = OUT_DIR / vid
     if not vid_path.exists():
-        app.logger.error(f"Video file not found: {vid_path}")
         flash(f"Video file not found: {vid}", "error")
         return redirect(url_for("index"))
-    
-    app.logger.info(f"Serving video: {vid_path}")
-    return render_template("preview.html",
-                           video_file=url_for("static", filename=f"outputs/{vid}"))
+    return render_template("preview.html", video_file=url_for("static", filename=f"outputs/{vid}"))
 
 @app.get("/debug")
 def debug():
-    """Debug endpoint to check if the app is running and show basic info."""
-    import os
-    debug_info = {
+    return {
         "app_running": True,
-        "cookies_file_exists": os.path.exists("cookies.txt"),
-        "downloads_dir_exists": DL_DIR.exists(),
-        "outputs_dir_exists": OUT_DIR.exists(),
-        "cookies_file_size": os.path.getsize("cookies.txt") if os.path.exists("cookies.txt") else 0,
-        "downloads_files": len(list(DL_DIR.glob("*"))),
-        "outputs_files": len(list(OUT_DIR.glob("*")))
+        "cookies_exists": Path("cookies.txt").exists(),
+        "downloads": [p.name for p in DL_DIR.iterdir()],
+        "outputs":  [p.name for p in OUT_DIR.iterdir()],
     }
-    return debug_info
 
 if __name__ == "__main__":
-    # For external access use: app.run(host="0.0.0.0", port=5000, debug=True)
+    # for prod you’d do: app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5000)))
     app.run(debug=True)

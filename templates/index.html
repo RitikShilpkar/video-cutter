@@ -1,29 +1,15 @@
 {% extends 'base.html' %}
 {% block content %}
-<h1>YouTube Clip Cutter</h1>
-<form method="post" action="{{ url_for('cut') }}" onsubmit="showSpinner()">
-  <label for="url">YouTube URL</label>
-  <input type="text" id="url" name="url" placeholder="https://www.youtube.com/watch?v=..." required>
+  <h1>Create a YouTube Clip</h1>
+  <form method="post" action="{{ url_for('cut') }}" onsubmit="showSpinner()">
+    <label for="url">YouTube URL</label>
+    <input type="text" id="url" name="url"
+           placeholder="https://www.youtube.com/watch?v=..." required>
 
-  <label for="timestamps">Timestamps (mm:ss-mm:ss, comma separated)</label>
-  <textarea id="timestamps" name="timestamps" placeholder="0:10-0:25, 1:02-1:30" required></textarea>
+    <label for="timestamps">Timestamps (mm:ss-mm:ss, comma separated) 0:10-0:25, 1:02-1:30</label>
+    <textarea id="timestamps" name="timestamps"
+              placeholder="0:10-0:25, 1:02-1:30" required></textarea>
 
-  <button type="submit">Create Clip</button>
-</form>
-<p style="margin-top:1rem;color:#555;font-size:0.9rem;">
-  Example: <code>0:10-0:25,1:02-1:30</code>
-</p>
-<div id="spinner" class="spinner">Processing… this may take a minute.</div>
-
-<div style="margin-top:2rem;padding:1rem;background:#f8f9fa;border-radius:8px;font-size:0.9rem;">
-  <h3 style="margin-top:0;color:#495057;">Tips for Best Results:</h3>
-  <ul style="margin:0;padding-left:1.5rem;color:#6c757d;">
-    <li>Use <strong>public YouTube videos</strong> (not private or unlisted)</li>
-    <li>Avoid videos that are <strong>age-restricted</strong> or region-blocked</li>
-    <li>If you get rate limit errors, <strong>wait a few minutes</strong> and try again</li>
-    <li>Make sure the video URL is <strong>correct and accessible</strong></li>
-    <li>For longer videos, processing may take <strong>2-3 minutes</strong></li>
-    <li><strong>Note:</strong> Cloud servers may be rate-limited by YouTube more than local machines</li>
-  </ul>
-</div>
+    <button type="submit">Cut & Preview</button>
+  </form>
 {% endblock %}

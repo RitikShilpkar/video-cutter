@@ -4,3 +4,4 @@ ffmpeg-python==0.2.0
 tqdm==4.66.4
 python-dotenv==1.0.1 
 gunicorn
+playwright>=1.30.0
