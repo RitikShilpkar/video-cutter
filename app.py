@@ -62,8 +62,11 @@ def download_youtube(url: str) -> Path:
     out_tmpl = str(DL_DIR / "%(id)s.%(ext)s")
     cookies = "cookies.txt"  # Path to your cookies file (must be present in the app directory)
     
+    # Add user-agent and other headers to look more like a real browser
+    user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    
     # Try with cookies first
-    cmd = f"yt-dlp --cookies {shlex.quote(cookies)} -f bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4 -o {shlex.quote(out_tmpl)} {shlex.quote(url)}"
+    cmd = f"yt-dlp --cookies {shlex.quote(cookies)} --user-agent {shlex.quote(user_agent)} --sleep-interval 2 --max-sleep-interval 5 -f bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4 -o {shlex.quote(out_tmpl)} {shlex.quote(url)}"
     try:
         app.logger.info(f"Running yt-dlp command: {cmd}")
         run(cmd)
@@ -78,7 +81,7 @@ def download_youtube(url: str) -> Path:
         
         # Check for specific error types
         if "429" in error_msg or "Too Many Requests" in error_msg:
-            raise RuntimeError("YouTube is rate limiting requests. Please try again in a few minutes or use a different video.")
+            raise RuntimeError("YouTube is rate limiting requests from cloud servers. Please try again in a few minutes or use a different video.")
         elif "content isn't available" in error_msg or "This content isn't available" in error_msg:
             raise RuntimeError("This video is not available (private, deleted, or region-restricted). Please try a different video.")
         elif "Sign in to confirm you're not a bot" in error_msg:
@@ -87,7 +90,7 @@ def download_youtube(url: str) -> Path:
             # Try without cookies as fallback
             try:
                 app.logger.info("Trying yt-dlp without cookies...")
-                cmd_no_cookies = f"yt-dlp -f bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4 -o {shlex.quote(out_tmpl)} {shlex.quote(url)}"
+                cmd_no_cookies = f"yt-dlp --user-agent {shlex.quote(user_agent)} --sleep-interval 2 --max-sleep-interval 5 -f bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4 -o {shlex.quote(out_tmpl)} {shlex.quote(url)}"
                 run(cmd_no_cookies)
                 files = sorted(DL_DIR.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True)
                 if not files:
@@ -96,7 +99,7 @@ def download_youtube(url: str) -> Path:
                 return files[0]
             except Exception as no_cookie_error:
                 app.logger.error(f"yt-dlp without cookies also failed: {no_cookie_error}")
-                raise RuntimeError(f"Unable to download video. Error: {error_msg}. Please try a different video or check if the URL is correct.")
+                raise RuntimeError(f"Unable to download video from cloud server. YouTube may be blocking requests from this IP. Please try a different video or try again later.")
 
 def cut_and_concat(src: Path, segments: List[Tuple[float, float]]) -> Path:
     """
