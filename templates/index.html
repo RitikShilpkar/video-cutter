@@ -1,15 +1,17 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% block content %}
-  <h1>Create a YouTube Clip</h1>
-  <form method="post" action="{{ url_for('cut') }}" onsubmit="showSpinner()">
+  <h1>YouTube Clip Cutter</h1>
+  <form method="post" action="/" onsubmit="showSpinner()">
     <label for="url">YouTube URL</label>
-    <input type="text" id="url" name="url"
-           placeholder="https://www.youtube.com/watch?v=..." required>
+    <input type="text" id="url" name="url" placeholder="https://youtube.com/..." required>
 
-    <label for="timestamps">Timestamps (mm:ss-mm:ss, comma separated) 0:10-0:25, 1:02-1:30</label>
+    <label for="timestamps">Timestamps (mm:ss-mm:ss, …)</label>
     <textarea id="timestamps" name="timestamps"
-              placeholder="0:10-0:25, 1:02-1:30" required></textarea>
+              placeholder="0:10-0:25,1:02-1:30" required></textarea>
 
-    <button type="submit">Cut & Preview</button>
+    <button type="submit">Cut &amp; Merge</button>
   </form>
+  <div id="spinner" class="spinner" style="display:none">
+    🔄 Processing… please wait.
+  </div>
 {% endblock %}

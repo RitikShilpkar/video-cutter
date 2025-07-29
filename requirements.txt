@@ -6,4 +6,4 @@ python-dotenv==1.0.1
 gunicorn
 playwright>=1.30.0
 pytube>=15.0
-
+requests>=2.28

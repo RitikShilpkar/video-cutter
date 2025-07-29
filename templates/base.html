@@ -1,27 +1,22 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>YouTube Clip Cutter</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">    
-<script>
-      function showSpinner(){
-        document.getElementById('spinner').style.display='flex';
-      }
-    </script>
-  </head>
-  <body>
-    <div id="spinner"><div class="loader"></div></div>
-    <div class="container">
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-          {% for cat,msg in messages %}
-            <div class="msg {{cat}}">{{msg}}</div>
-          {% endfor %}
-        {% endif %}
-      {% endwith %}
-      {% block content %}{% endblock %}
-    </div>
-  </body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>YT Clip Cutter</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script>
+    function showSpinner(){
+      document.getElementById("spinner").style.display = "block";
+    }
+  </script>
+</head>
+<body>
+  {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% for cat,msg in msgs %}
+      <div class="flash {{cat}}">{{msg}}</div>
+    {% endfor %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</body>
 </html>

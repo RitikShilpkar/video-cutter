@@ -1,7 +1,7 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% block content %}
   <h1>Your Clip</h1>
-  <video src="{{ video_file }}" controls></video>
-  <p><a class="download-link" href="{{ video_file }}" download>⬇ Download MP4</a></p>
-  <p><a href="{{ url_for('index') }}">&larr; Make another clip</a></p>
+  <video src="{{ video_file }}" controls style="max-width:100%"></video>
+  <p><a href="{{ video_file }}" download>Download MP4</a></p>
+  <p><a href="/">← back</a></p>
 {% endblock %}
